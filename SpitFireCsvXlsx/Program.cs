@@ -1,17 +1,22 @@
-﻿using System.Text.RegularExpressions;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Threading;
 using MiniExcelLibs;
-
+using Spectre.Console;
 
 class Program
 {
     static void Main(string[] args)
     {
-        Console.WriteLine("INICIO");
+        AnsiConsole.MarkupLine("[bold green]INICIO[/]");
         string directorioCsv = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "csv");
-        string archivoSalida = $"merge-{DateTime.Now.ToString("yyyy-MM-dd")}.xlsx";
+        string archivoSalida = $"merge-{DateTime.Now:yyyy-MM-dd}.xlsx";
 
         LeerCsvYCrearXlsx(directorioCsv, archivoSalida);
-        Console.WriteLine("Presiona Enter para cerrar la consola...");
+        AnsiConsole.MarkupLine("[bold yellow]Presiona Enter para cerrar la consola...[/]");
         Console.ReadLine();
     }
 
@@ -19,16 +24,15 @@ class Program
     {
         try
         {
-
-
             // Obtén la lista de archivos CSV en el directorio especificado
             var archivosCsv = Directory.GetFiles(directorioCsv, "*.csv");
 
             if (archivosCsv.Length == 0)
             {
-                Console.WriteLine("No se encontraron archivos CSV en el directorio especificado.");
+                AnsiConsole.MarkupLine("[red]No se encontraron archivos CSV en el directorio especificado.[/]");
                 return;
             }
+
             // Ordenar los archivos CSV por el número en el nombre del archivo
             var archivosCsvOrdenados = archivosCsv
                 .Select(f => new
@@ -42,66 +46,66 @@ class Program
 
             // Lista para almacenar todas las filas de los CSV
             var todasLasFilas = new List<dynamic>();
-
             bool esPrimerArchivo = true;
 
-            foreach (var archivoCsv in archivosCsvOrdenados)
-            {
-                Console.WriteLine("Merging " + Path.GetFileName(archivoCsv));
-                // Lee cada archivo CSV y convierte su contenido a una lista de diccionarios
-                var configuration = new MiniExcelLibs.Csv.CsvConfiguration
+            AnsiConsole.Progress()
+                .Start(ctx =>
                 {
-                    Seperator = '\t' // Establecer el delimitador deseado, por ejemplo, punto y coma
-                };
+                    var task = ctx.AddTask("[green]Procesando archivos CSV[/]", maxValue: archivosCsvOrdenados.Count);
 
-                var filas = MiniExcel.Query(archivoCsv, configuration: configuration).ToList();
+                    foreach (var archivoCsv in archivosCsvOrdenados)
+                    {
+                        AnsiConsole.MarkupLine($"[blue]Merging {Path.GetFileName(archivoCsv)}[/]");
 
-                // Limpiar las filas usando el método CleanRow
-                var filasLimpias = filas.Select(row => CleanRow(row)).ToList();
-                if (esPrimerArchivo)
-                {
-                    // Añade todas las filas incluyendo la cabecera del primer archivo
-                    todasLasFilas.AddRange(filasLimpias);
-                    esPrimerArchivo = false;
-                }
-                else
-                {
-                    // Añade las filas de los archivos siguientes, omitiendo la primera fila (cabecera)
-                    todasLasFilas.AddRange(filas.Skip(1));
-                }
-            }
+                        var configuration = new MiniExcelLibs.Csv.CsvConfiguration
+                        {
+                            Seperator = '\t' // Establecer el delimitador deseado, por ejemplo, punto y coma
+                        };
 
+                        var filas = MiniExcel.Query(archivoCsv, configuration: configuration).ToList();
+                        var filasLimpias = filas.Select(row => CleanRow(row)).ToList();
+
+                        if (esPrimerArchivo)
+                        {
+                            todasLasFilas.AddRange(filasLimpias);
+                            esPrimerArchivo = false;
+                        }
+                        else
+                        {
+                            todasLasFilas.AddRange(filas.Skip(1));
+                        }
+
+                        task.Increment(1);
+                        Thread.Sleep(200); // Pausa de 200 milisegundos para ver el progreso
+                    }
+                });
 
             MiniExcel.SaveAs(archivoSalida, todasLasFilas, printHeader: false, excelType: ExcelType.XLSX, overwriteFile: true);
 
-            Console.WriteLine($"El archivo Excel '{archivoSalida}' se ha creado exitosamente.");
+            AnsiConsole.MarkupLine($"[bold green]El archivo Excel '{archivoSalida}' se ha creado exitosamente.[/]");
         }
         catch (Exception ex)
         {
-
-            Console.WriteLine(ex);
+            AnsiConsole.MarkupLine($"[bold red]Error: {ex.Message}[/]");
         }
     }
 
     static long ExtractNumberFromFileName(string fileName)
     {
-        // Extrae la primera secuencia numérica del nombre del archivo
         var match = Regex.Match(fileName, @"\d+");
         return match.Success ? long.Parse(match.Value) : 0;
     }
+
     static IDictionary<string, object> CleanRow(IDictionary<string, object> row)
     {
         var cleanedRow = new Dictionary<string, object>();
 
         foreach (var kvp in row)
         {
-            // Limpia cada valor usando la expresión regular
             var cleanedValue = Regex.Replace(kvp.Value.ToString(), @"=""(.*?)""", "$1");
             cleanedRow[kvp.Key] = cleanedValue;
-
         }
 
         return cleanedRow;
     }
-
 }
