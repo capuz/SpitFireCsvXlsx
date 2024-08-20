@@ -11,7 +11,8 @@ class Program
 {
     static void Main(string[] args)
     {
-        AnsiConsole.MarkupLine("[bold green]INICIO[/]");
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
+        AnsiConsole.MarkupLine("[bold green]INICIO:[/]");
         string directorioCsv = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "csv");
         string archivoSalida = $"merge-{DateTime.Now:yyyy-MM-dd}.xlsx";
 
@@ -61,7 +62,7 @@ class Program
                         {
                             Seperator = '\t' // Establecer el delimitador deseado, por ejemplo, punto y coma
                         };
-
+              
                         var filas = MiniExcel.Query(archivoCsv, configuration: configuration).ToList();
                         var filasLimpias = filas.Select(row => CleanRow(row)).ToList();
 
@@ -72,11 +73,11 @@ class Program
                         }
                         else
                         {
-                            todasLasFilas.AddRange(filas.Skip(1));
+                            todasLasFilas.AddRange(filasLimpias.Skip(1));
                         }
 
                         task.Increment(1);
-                        Thread.Sleep(200); // Pausa de 200 milisegundos para ver el progreso
+                        Thread.Sleep(130); // Pausa de 130 milisegundos para ver el progreso
                     }
                 });
 
